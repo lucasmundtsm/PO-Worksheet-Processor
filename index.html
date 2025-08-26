@@ -379,7 +379,14 @@
                 <li>Upload your Product Catalog CSV file (contains SKU information, carton quantities, weights, and volumes)</li>
                 <li>Upload your PO Upload Excel file (purchase order data from Amazon)</li>
                 <li>Click "Process Files" to generate the complete analysis</li>
-                <li>The tool will create multiple worksheets with calculations and pivot tables</li>
+                <li>The tool will create multiple worksheets with calculations:
+                    <ul style="margin-top: 5px; list-style-type: disc; margin-left: 20px;">
+                        <li>CARTONS = Total Qty to Fulfill ÷ ctn qty</li>
+                        <li>VOL = cuft × CARTONS</li>
+                        <li>WT = lbs × CARTONS</li>
+                        <li>PALLETS = CARTONS ÷ 25</li>
+                    </ul>
+                </li>
                 <li>Download the processed Excel file with all tabs ready for use</li>
             </ol>
         </div>
@@ -687,11 +694,9 @@
                     processedRow['cuft'] = catalogItem.cuft;
                     processedRow['lbs'] = catalogItem.lbs;
 
-                    // Calculate CARTONS (must be even number, divisible)
+                    // Calculate CARTONS (simple division)
                     if (catalogItem.ctnQty > 0) {
-                        const exactCartons = processedRow['Total Qty to Fulfill'] / catalogItem.ctnQty;
-                        // Round to nearest even number
-                        processedRow['CARTONS'] = Math.round(exactCartons / 2) * 2 || 2;
+                        processedRow['CARTONS'] = processedRow['Total Qty to Fulfill'] / catalogItem.ctnQty;
                     }
 
                     // Calculate VOL, WT, PALLETS
