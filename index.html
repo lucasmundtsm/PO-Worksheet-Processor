@@ -13,7 +13,7 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #3b6cb8 100%);
+            background: #000000;
             min-height: 100vh;
             color: #ffffff;
             line-height: 1.6;
@@ -29,7 +29,7 @@
             text-align: center;
             margin-bottom: 40px;
             padding-bottom: 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .title {
@@ -46,7 +46,7 @@
 
         .subtitle {
             font-size: 1.2rem;
-            color: #b0c4de;
+            color: #999999;
             font-weight: 400;
         }
 
@@ -58,23 +58,16 @@
         }
 
         .upload-card {
-            background: rgba(10, 10, 10, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: #0a0a0a;
+            border: 1px solid #1a1a1a;
             border-radius: 12px;
             padding: 30px;
             transition: all 0.3s ease;
-            backdrop-filter: blur(10px);
         }
 
         .upload-card:hover {
-            border-color: rgba(255, 255, 255, 0.2);
-            background: rgba(20, 20, 20, 0.7);
-        }
-
-        .upload-card.drag-over {
-            border-color: #4ade80;
-            background: rgba(74, 222, 128, 0.1);
-            transform: scale(1.02);
+            border-color: #333333;
+            background: #111111;
         }
 
         .upload-label {
@@ -100,44 +93,26 @@
             display: block;
             width: 100%;
             padding: 15px;
-            background: rgba(255, 255, 255, 0.05);
-            color: #b0c4de;
-            border: 2px dashed rgba(255, 255, 255, 0.2);
+            background: #1a1a1a;
+            color: #999999;
+            border: 2px dashed #333333;
             border-radius: 8px;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s ease;
             font-size: 1rem;
-            position: relative;
         }
 
         .file-input-button:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: rgba(255, 255, 255, 0.4);
+            background: #222222;
+            border-color: #555555;
             color: #ffffff;
         }
 
         .file-input-button.has-file {
-            background: rgba(74, 222, 128, 0.1);
-            border-color: #4ade80;
+            background: #0f1f0f;
+            border-color: #2a4a2a;
             color: #4ade80;
-        }
-
-        .file-input-button::before {
-            content: '📁';
-            display: block;
-            font-size: 2rem;
-            margin-bottom: 10px;
-        }
-
-        .file-input-button.has-file::before {
-            content: '✅';
-        }
-
-        .drag-text {
-            font-size: 0.85rem;
-            color: rgba(255, 255, 255, 0.5);
-            margin-top: 5px;
         }
 
         .process-button {
@@ -177,13 +152,12 @@
         }
 
         .status-section {
-            background: rgba(10, 10, 10, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: #0a0a0a;
+            border: 1px solid #1a1a1a;
             border-radius: 12px;
             padding: 30px;
             margin-bottom: 40px;
             display: none;
-            backdrop-filter: blur(10px);
         }
 
         .status-section.active {
@@ -205,38 +179,37 @@
         }
 
         .status-message.info {
-            background: rgba(59, 130, 246, 0.15);
-            border: 1px solid rgba(59, 130, 246, 0.3);
-            color: #93bbfc;
+            background: #0a1a2a;
+            border: 1px solid #1a3a5a;
+            color: #60a5fa;
         }
 
         .status-message.success {
-            background: rgba(74, 222, 128, 0.15);
-            border: 1px solid rgba(74, 222, 128, 0.3);
+            background: #0a2a0a;
+            border: 1px solid #1a4a1a;
             color: #4ade80;
         }
 
         .status-message.warning {
-            background: rgba(251, 191, 36, 0.15);
-            border: 1px solid rgba(251, 191, 36, 0.3);
+            background: #2a1a0a;
+            border: 1px solid #4a3a1a;
             color: #fbbf24;
         }
 
         .status-message.error {
-            background: rgba(248, 113, 113, 0.15);
-            border: 1px solid rgba(248, 113, 113, 0.3);
+            background: #2a0a0a;
+            border: 1px solid #4a1a1a;
             color: #f87171;
         }
 
         .missing-skus-list {
             max-height: 200px;
             overflow-y: auto;
-            background: rgba(0, 0, 0, 0.4);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: #050505;
+            border: 1px solid #1a1a1a;
             border-radius: 6px;
             padding: 15px;
             margin-top: 10px;
-            backdrop-filter: blur(5px);
         }
 
         .missing-sku-item {
@@ -285,12 +258,11 @@
         }
 
         .stat-card {
-            background: rgba(10, 10, 10, 0.4);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: #050505;
+            border: 1px solid #1a1a1a;
             border-radius: 8px;
             padding: 20px;
             text-align: center;
-            backdrop-filter: blur(5px);
         }
 
         .stat-value {
@@ -302,7 +274,7 @@
 
         .stat-label {
             font-size: 0.9rem;
-            color: #b0c4de;
+            color: #666666;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
@@ -313,7 +285,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(30, 60, 114, 0.95);
+            background: rgba(0, 0, 0, 0.9);
             display: none;
             align-items: center;
             justify-content: center;
@@ -327,7 +299,7 @@
         .loading-spinner {
             width: 60px;
             height: 60px;
-            border: 3px solid rgba(255, 255, 255, 0.2);
+            border: 3px solid #333333;
             border-top-color: #ffffff;
             border-radius: 50%;
             animation: spin 1s linear infinite;
@@ -338,12 +310,11 @@
         }
 
         .instructions {
-            background: rgba(10, 10, 10, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: #0a0a0a;
+            border: 1px solid #1a1a1a;
             border-radius: 12px;
             padding: 30px;
             margin-bottom: 40px;
-            backdrop-filter: blur(10px);
         }
 
         .instructions h3 {
@@ -354,7 +325,7 @@
 
         .instructions ol {
             margin-left: 20px;
-            color: #b0c4de;
+            color: #999999;
         }
 
         .instructions li {
@@ -379,37 +350,28 @@
                 <li>Upload your Product Catalog CSV file (contains SKU information, carton quantities, weights, and volumes)</li>
                 <li>Upload your PO Upload Excel file (purchase order data from Amazon)</li>
                 <li>Click "Process Files" to generate the complete analysis</li>
-                <li>The tool will create multiple worksheets with calculations:
-                    <ul style="margin-top: 5px; list-style-type: disc; margin-left: 20px;">
-                        <li>CARTONS = Total Qty to Fulfill ÷ ctn qty</li>
-                        <li>VOL = cuft × CARTONS</li>
-                        <li>WT = lbs × CARTONS</li>
-                        <li>PALLETS = CARTONS ÷ 25</li>
-                    </ul>
-                </li>
+                <li>The tool will create multiple worksheets with calculations and pivot tables</li>
                 <li>Download the processed Excel file with all tabs ready for use</li>
             </ol>
         </div>
 
         <div class="upload-section">
-            <div class="upload-card" id="catalogCard">
+            <div class="upload-card">
                 <label class="upload-label">Product Catalog (CSV)</label>
                 <div class="file-input-wrapper">
                     <input type="file" id="catalogFile" class="file-input" accept=".csv">
                     <label for="catalogFile" class="file-input-button" id="catalogLabel">
                         Choose Product Catalog CSV...
-                        <div class="drag-text">or drag and drop file here</div>
                     </label>
                 </div>
             </div>
 
-            <div class="upload-card" id="poCard">
+            <div class="upload-card">
                 <label class="upload-label">PO Upload File (Excel)</label>
                 <div class="file-input-wrapper">
                     <input type="file" id="poFile" class="file-input" accept=".xlsx,.xls">
                     <label for="poFile" class="file-input-button" id="poLabel">
                         Choose PO Upload Excel...
-                        <div class="drag-text">or drag and drop file here</div>
                     </label>
                 </div>
             </div>
@@ -437,119 +399,38 @@
         let catalogData = null;
         let poData = null;
         let processedWorkbook = null;
-        
-        // Store files from both input and drag-drop
-        let catalogFileStore = null;
-        let poFileStore = null;
 
         // File input handlers
         document.getElementById('catalogFile').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
-                catalogFileStore = file;
-                handleCatalogFile(file);
+                document.getElementById('catalogLabel').textContent = file.name;
+                document.getElementById('catalogLabel').classList.add('has-file');
+                checkFilesReady();
             }
         });
 
         document.getElementById('poFile').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
-                poFileStore = file;
-                handlePOFile(file);
+                document.getElementById('poLabel').textContent = file.name;
+                document.getElementById('poLabel').classList.add('has-file');
+                checkFilesReady();
             }
         });
-
-        // Drag and drop handlers
-        const catalogCard = document.getElementById('catalogCard');
-        const poCard = document.getElementById('poCard');
-
-        // Prevent default drag behaviors
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            catalogCard.addEventListener(eventName, preventDefaults, false);
-            poCard.addEventListener(eventName, preventDefaults, false);
-            document.body.addEventListener(eventName, preventDefaults, false);
-        });
-
-        // Highlight drop area when item is dragged over it
-        ['dragenter', 'dragover'].forEach(eventName => {
-            catalogCard.addEventListener(eventName, () => highlight(catalogCard), false);
-            poCard.addEventListener(eventName, () => highlight(poCard), false);
-        });
-
-        ['dragleave', 'drop'].forEach(eventName => {
-            catalogCard.addEventListener(eventName, () => unhighlight(catalogCard), false);
-            poCard.addEventListener(eventName, () => unhighlight(poCard), false);
-        });
-
-        // Handle dropped files
-        catalogCard.addEventListener('drop', handleCatalogDrop, false);
-        poCard.addEventListener('drop', handlePODrop, false);
-
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        function highlight(card) {
-            card.classList.add('drag-over');
-        }
-
-        function unhighlight(card) {
-            card.classList.remove('drag-over');
-        }
-
-        function handleCatalogDrop(e) {
-            const dt = e.dataTransfer;
-            const files = dt.files;
-            
-            if (files.length > 0) {
-                const file = files[0];
-                if (file.name.toLowerCase().endsWith('.csv')) {
-                    catalogFileStore = file;
-                    handleCatalogFile(file);
-                } else {
-                    alert('Please drop a CSV file for the Product Catalog');
-                }
-            }
-        }
-
-        function handlePODrop(e) {
-            const dt = e.dataTransfer;
-            const files = dt.files;
-            
-            if (files.length > 0) {
-                const file = files[0];
-                if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) {
-                    poFileStore = file;
-                    handlePOFile(file);
-                } else {
-                    alert('Please drop an Excel file (.xlsx or .xls) for the PO Upload');
-                }
-            }
-        }
-
-        function handleCatalogFile(file) {
-            const label = document.getElementById('catalogLabel');
-            label.innerHTML = file.name + '<div class="drag-text">File loaded successfully!</div>';
-            label.classList.add('has-file');
-            checkFilesReady();
-        }
-
-        function handlePOFile(file) {
-            const label = document.getElementById('poLabel');
-            label.innerHTML = file.name + '<div class="drag-text">File loaded successfully!</div>';
-            label.classList.add('has-file');
-            checkFilesReady();
-        }
 
         function checkFilesReady() {
-            // Check both file stores instead of just input elements
-            document.getElementById('processButton').disabled = !(catalogFileStore && poFileStore);
+            const catalogFile = document.getElementById('catalogFile').files[0];
+            const poFile = document.getElementById('poFile').files[0];
+            document.getElementById('processButton').disabled = !(catalogFile && poFile);
         }
 
         // Process button handler
         document.getElementById('processButton').addEventListener('click', async function() {
-            if (!catalogFileStore || !poFileStore) {
+            const catalogFile = document.getElementById('catalogFile').files[0];
+            const poFile = document.getElementById('poFile').files[0];
+
+            if (!catalogFile || !poFile) {
                 alert('Please select both files');
                 return;
             }
@@ -561,12 +442,12 @@
             try {
                 // Read Product Catalog CSV
                 showStatus('info', 'Reading Product Catalog CSV...');
-                catalogData = await readCatalogCSV(catalogFileStore);
+                catalogData = await readCatalogCSV(catalogFile);
                 showStatus('success', `Product Catalog loaded: ${Object.keys(catalogData).length} SKUs`);
 
                 // Read PO Upload Excel
                 showStatus('info', 'Reading PO Upload Excel file...');
-                poData = await readPOExcel(poFileStore);
+                poData = await readPOExcel(poFile);
                 showStatus('success', `PO Upload loaded: ${poData.length} rows`);
 
                 // Process the data
@@ -694,9 +575,11 @@
                     processedRow['cuft'] = catalogItem.cuft;
                     processedRow['lbs'] = catalogItem.lbs;
 
-                    // Calculate CARTONS (simple division)
+                    // Calculate CARTONS (must be even number, divisible)
                     if (catalogItem.ctnQty > 0) {
-                        processedRow['CARTONS'] = processedRow['Total Qty to Fulfill'] / catalogItem.ctnQty;
+                        const exactCartons = processedRow['Total Qty to Fulfill'] / catalogItem.ctnQty;
+                        // Round to nearest even number
+                        processedRow['CARTONS'] = Math.round(exactCartons / 2) * 2 || 2;
                     }
 
                     // Calculate VOL, WT, PALLETS
