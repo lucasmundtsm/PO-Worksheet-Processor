@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PO Upload Processor - Simple Modern</title>
+    <title>PO Worksheet Processor - Simple Modern (Enhanced with Estimation)</title>
     <style>
         * {
             margin: 0;
@@ -360,6 +360,16 @@
         .instructions li {
             margin-bottom: 10px;
         }
+
+        .feature-highlight {
+            background: rgba(74, 222, 128, 0.1);
+            border: 1px solid rgba(74, 222, 128, 0.3);
+            border-radius: 6px;
+            padding: 10px;
+            margin-top: 15px;
+            font-size: 0.9rem;
+            color: #4ade80;
+        }
     </style>
 </head>
 <body>
@@ -370,7 +380,7 @@
     <div class="container">
         <header class="header">
             <h1 class="title">PO Upload Processor</h1>
-            <p class="subtitle">Automated Product Catalog Integration & Analysis</p>
+            <p class="subtitle">Automated Product Catalog Integration & Analysis with Smart Estimation</p>
         </header>
 
         <div class="instructions">
@@ -380,8 +390,14 @@
                 <li>Upload your PO Upload Excel file (purchase order data from Amazon)</li>
                 <li>Click "Process Files" to generate the complete analysis</li>
                 <li>The tool will create multiple worksheets with calculations and pivot tables</li>
+                <li>Missing logistics data will be intelligently estimated using similar products</li>
+                <li>Detail rows show fractional pallets (Volume÷75), pivot tables show shipment pallets (&lt;15 cartons = 0, ≥15 cartons = rounded up whole numbers, min 1)</li>
                 <li>Download the processed Excel file with all tabs ready for use</li>
             </ol>
+            <div class="feature-highlight">
+                🧠 <strong>NEW:</strong> Smart Estimation Engine - When product data is missing, the tool will automatically estimate values based on similar SKUs, product families, and category defaults. An "estimation used" tab will show which values were estimated.<br><br>
+                📦 <strong>ENHANCED:</strong> Simplified Pallet Logic - Detail rows use fractional pallets (Volume÷75), while pivot tables use shipment logic (&lt;15 cartons = 0 pallets, ≥15 cartons = whole pallets rounded up from Volume÷75, minimum 1).
+            </div>
         </div>
 
         <div class="upload-section">
@@ -563,7 +579,7 @@
                 showStatus('success', `PO Upload loaded: ${poData.length} rows`);
 
                 // Process the data
-                showStatus('info', 'Processing data and calculations...');
+                showStatus('info', 'Processing data and applying intelligent estimation...');
                 const processed = processData(poData, catalogData);
 
                 // Create Excel workbook
@@ -603,14 +619,17 @@
                         dynamicTyping: true,
                         skipEmptyLines: true,
                         complete: function(results) {
-                            // Create a lookup object by External ID
+                            // Create a lookup object by External ID with additional fields
                             const catalog = {};
                             results.data.forEach(row => {
                                 if (row['External ID']) {
                                     catalog[row['External ID']] = {
                                         ctnQty: row['Units per Carton'] || 0,
                                         cuft: row['Carton Volume (CBF)'] || 0,
-                                        lbs: row['Carton Weight (lbs)'] || 0
+                                        lbs: row['Carton Weight (lbs)'] || 0,
+                                        configuration: row['Configuration'] || '',
+                                        category: row['Product Category'] || '',
+                                        displayName: row['Display Name'] || ''
                                     };
                                 }
                             });
@@ -646,8 +665,40 @@
         function processData(poData, catalogData) {
             const processed = [];
             const missingSKUs = new Set();
+            const estimationLog = [];
             let totalProcessed = 0;
             let totalMatched = 0;
+            let totalEstimated = 0;
+
+            // First pass: collect all catalog data for estimation analysis
+            const catalogByConfiguration = {};
+            const catalogByFamily = {};
+            const catalogByCategory = {};
+
+            Object.keys(catalogData).forEach(sku => {
+                const item = catalogData[sku];
+                if (item.configuration) {
+                    if (!catalogByConfiguration[item.configuration]) {
+                        catalogByConfiguration[item.configuration] = [];
+                    }
+                    catalogByConfiguration[item.configuration].push({ ...item, sku: sku });
+                }
+
+                const family = sku.split('-')[0];
+                if (family) {
+                    if (!catalogByFamily[family]) {
+                        catalogByFamily[family] = [];
+                    }
+                    catalogByFamily[family].push({ ...item, sku: sku });
+                }
+
+                if (item.category) {
+                    if (!catalogByCategory[item.category]) {
+                        catalogByCategory[item.category] = [];
+                    }
+                    catalogByCategory[item.category].push({ ...item, sku: sku });
+                }
+            });
 
             poData.forEach(row => {
                 // Create base row with reordered columns
@@ -678,30 +729,131 @@
                 // Look up SKU in catalog
                 const sku = processedRow['SKU'];
                 const catalogItem = catalogData[sku];
+                const estimationRecord = {
+                    sku: sku,
+                    row: totalProcessed + 1,
+                    fulfillmentCenter: processedRow['Fulfillment Center'],
+                    poWarehouse: processedRow['PO Warehouse Final'],
+                    totalQty: processedRow['Total Qty to Fulfill'],
+                    estimations: []
+                };
 
-                if (catalogItem && processedRow['Total Qty to Fulfill'] > 0) {
-                    totalMatched++;
-                    
-                    // Add catalog data
-                    processedRow['ctn qty'] = catalogItem.ctnQty;
-                    processedRow['cuft'] = catalogItem.cuft;
-                    processedRow['lbs'] = catalogItem.lbs;
+                if (processedRow['Total Qty to Fulfill'] > 0) {
+                    let ctnQty = 0;
+                    let cuft = 0;
+                    let lbs = 0;
 
-                    // Calculate CARTONS (must be even number, divisible)
-                    if (catalogItem.ctnQty > 0) {
-                        const exactCartons = processedRow['Total Qty to Fulfill'] / catalogItem.ctnQty;
-                        // Round to nearest even number
-                        processedRow['CARTONS'] = Math.round(exactCartons / 2) * 2 || 2;
+                    if (catalogItem) {
+                        totalMatched++;
+                        
+                        // Use existing data or estimate missing values
+                        if (catalogItem.ctnQty > 0) {
+                            ctnQty = catalogItem.ctnQty;
+                        } else {
+                            const estimated = estimateValue(sku, 'ctnQty', catalogByConfiguration, catalogByFamily, catalogByCategory);
+                            if (estimated.value > 0) {
+                                ctnQty = estimated.value;
+                                estimationRecord.estimations.push({
+                                    field: 'ctn qty',
+                                    value: estimated.value,
+                                    method: estimated.method,
+                                    source: estimated.source
+                                });
+                            }
+                        }
+
+                        if (catalogItem.cuft > 0) {
+                            cuft = catalogItem.cuft;
+                        } else {
+                            const estimated = estimateValue(sku, 'cuft', catalogByConfiguration, catalogByFamily, catalogByCategory);
+                            if (estimated.value > 0) {
+                                cuft = estimated.value;
+                                estimationRecord.estimations.push({
+                                    field: 'cuft',
+                                    value: estimated.value,
+                                    method: estimated.method,
+                                    source: estimated.source
+                                });
+                            }
+                        }
+
+                        if (catalogItem.lbs > 0) {
+                            lbs = catalogItem.lbs;
+                        } else {
+                            const estimated = estimateValue(sku, 'lbs', catalogByConfiguration, catalogByFamily, catalogByCategory);
+                            if (estimated.value > 0) {
+                                lbs = estimated.value;
+                                estimationRecord.estimations.push({
+                                    field: 'lbs',
+                                    value: estimated.value,
+                                    method: estimated.method,
+                                    source: estimated.source
+                                });
+                            }
+                        }
+                    } else {
+                        // SKU not found in catalog - try to estimate all values
+                        const ctnEstimate = estimateValue(sku, 'ctnQty', catalogByConfiguration, catalogByFamily, catalogByCategory);
+                        const cuftEstimate = estimateValue(sku, 'cuft', catalogByConfiguration, catalogByFamily, catalogByCategory);
+                        const lbsEstimate = estimateValue(sku, 'lbs', catalogByConfiguration, catalogByFamily, catalogByCategory);
+
+                        if (ctnEstimate.value > 0) {
+                            ctnQty = ctnEstimate.value;
+                            estimationRecord.estimations.push({
+                                field: 'ctn qty',
+                                value: ctnEstimate.value,
+                                method: ctnEstimate.method,
+                                source: ctnEstimate.source
+                            });
+                        }
+
+                        if (cuftEstimate.value > 0) {
+                            cuft = cuftEstimate.value;
+                            estimationRecord.estimations.push({
+                                field: 'cuft',
+                                value: cuftEstimate.value,
+                                method: cuftEstimate.method,
+                                source: cuftEstimate.source
+                            });
+                        }
+
+                        if (lbsEstimate.value > 0) {
+                            lbs = lbsEstimate.value;
+                            estimationRecord.estimations.push({
+                                field: 'lbs',
+                                value: lbsEstimate.value,
+                                method: lbsEstimate.method,
+                                source: lbsEstimate.source
+                            });
+                        }
+
+                        if (estimationRecord.estimations.length === 0) {
+                            missingSKUs.add(sku);
+                        }
+                    }
+
+                    // Set the values
+                    processedRow['ctn qty'] = ctnQty;
+                    processedRow['cuft'] = cuft;
+                    processedRow['lbs'] = lbs;
+
+                    // Calculate CARTONS (must be sufficient to fulfill total quantity)
+                    if (ctnQty > 0) {
+                        processedRow['CARTONS'] = Math.ceil(processedRow['Total Qty to Fulfill'] / ctnQty);
                     }
 
                     // Calculate VOL, WT, PALLETS
-                    if (processedRow['CARTONS']) {
+                    if (processedRow['CARTONS'] && processedRow['CARTONS'] > 0) {
                         processedRow['VOL'] = processedRow['cuft'] * processedRow['CARTONS'];
                         processedRow['WT'] = processedRow['lbs'] * processedRow['CARTONS'];
-                        processedRow['PALLETS'] = processedRow['CARTONS'] / 25;
+                        processedRow['PALLETS'] = processedRow['VOL'] / 75;
                     }
-                } else if (sku && processedRow['Total Qty to Fulfill'] > 0) {
-                    missingSKUs.add(sku);
+
+                    // Track estimations
+                    if (estimationRecord.estimations.length > 0) {
+                        totalEstimated++;
+                        estimationLog.push(estimationRecord);
+                    }
                 }
 
                 // Add remaining original columns
@@ -720,12 +872,70 @@
                 showMissingSKUs(Array.from(missingSKUs));
             }
 
-            showStatus('info', `Processed ${totalProcessed} rows, matched ${totalMatched} SKUs`);
+            showStatus('info', `Processed ${totalProcessed} rows, matched ${totalMatched} SKUs, estimated ${totalEstimated} SKUs`);
 
             return {
                 allData: processed,
-                missingSKUs: Array.from(missingSKUs)
+                missingSKUs: Array.from(missingSKUs),
+                estimationLog: estimationLog
             };
+        }
+
+        function estimateValue(sku, field, catalogByConfiguration, catalogByFamily, catalogByCategory) {
+            const result = { value: 0, method: '', source: '' };
+
+            // Try to get configuration from the original catalog data if available
+            let configuration = null;
+            if (catalogData[sku] && catalogData[sku].configuration) {
+                configuration = catalogData[sku].configuration;
+            }
+
+            // Level 1: Configuration-based matching
+            if (configuration && catalogByConfiguration[configuration]) {
+                const matches = catalogByConfiguration[configuration].filter(item => item[field] > 0);
+                if (matches.length > 0) {
+                    result.value = calculateMedian(matches.map(item => item[field]));
+                    result.method = 'Configuration Match';
+                    result.source = `${matches.length} items with config: ${configuration}`;
+                    return result;
+                }
+            }
+
+            // Level 2: Product family matching
+            const family = sku.split('-')[0];
+            if (family && catalogByFamily[family]) {
+                const matches = catalogByFamily[family].filter(item => item[field] > 0);
+                if (matches.length > 0) {
+                    result.value = calculateMedian(matches.map(item => item[field]));
+                    result.method = 'Product Family Match';
+                    result.source = `${matches.length} items in family: ${family}`;
+                    return result;
+                }
+            }
+
+            // Level 3: Category-based estimation (fallback)
+            // Try to determine category from SKU patterns or use defaults
+            const categoryDefaults = {
+                'ctnQty': { 'Tumblers': 12, 'Kids Bags': 40, 'Accessory': 24, 'default': 12 },
+                'cuft': { 'Tumblers': 0.8, 'Kids Bags': 0.5, 'Accessory': 0.6, 'default': 0.7 },
+                'lbs': { 'Tumblers': 15, 'Kids Bags': 8, 'Accessory': 10, 'default': 12 }
+            };
+
+            // Use category defaults as last resort
+            if (categoryDefaults[field]) {
+                result.value = categoryDefaults[field]['default'];
+                result.method = 'Category Default';
+                result.source = 'General product category default';
+            }
+
+            return result;
+        }
+
+        function calculateMedian(values) {
+            if (values.length === 0) return 0;
+            const sorted = [...values].sort((a, b) => a - b);
+            const mid = Math.floor(sorted.length / 2);
+            return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
         }
 
         function createExcelWorkbook(processed) {
@@ -760,7 +970,36 @@
             const wsUnisPivot = XLSX.utils.json_to_sheet(unisPivot);
             XLSX.utils.book_append_sheet(wb, wsUnisPivot, 'unis pivot');
 
+            // Create Estimation Log sheet
+            if (processed.estimationLog && processed.estimationLog.length > 0) {
+                const estimationSheet = createEstimationSheet(processed.estimationLog);
+                const wsEstimation = XLSX.utils.json_to_sheet(estimationSheet);
+                XLSX.utils.book_append_sheet(wb, wsEstimation, 'estimation used');
+            }
+
             return wb;
+        }
+
+        function createEstimationSheet(estimationLog) {
+            const estimationRows = [];
+            
+            estimationLog.forEach(record => {
+                record.estimations.forEach(est => {
+                    estimationRows.push({
+                        'Row': record.row,
+                        'SKU': record.sku,
+                        'Fulfillment Center': record.fulfillmentCenter,
+                        'PO Warehouse': record.poWarehouse,
+                        'Total Qty to Fulfill': record.totalQty,
+                        'Field Estimated': est.field,
+                        'Estimated Value': est.value,
+                        'Estimation Method': est.method,
+                        'Source/Basis': est.source
+                    });
+                });
+            });
+
+            return estimationRows;
         }
 
         function createPivotData(data) {
@@ -784,7 +1023,21 @@
                 pivot[fc]['Sum of CARTONS'] += row['CARTONS'] || 0;
                 pivot[fc]['Sum of WT'] += row['WT'] || 0;
                 pivot[fc]['Sum of VOL'] += row['VOL'] || 0;
-                pivot[fc]['Sum of PALLETS'] += row['PALLETS'] || 0;
+            });
+
+            // Calculate shipment-level pallets for each FC
+            Object.keys(pivot).forEach(fc => {
+                const totalCartons = pivot[fc]['Sum of CARTONS'];
+                const totalVolume = pivot[fc]['Sum of VOL'];
+                
+                if (totalCartons < 15) {
+                    // Small shipments don't require palletization
+                    pivot[fc]['Sum of PALLETS'] = 0;
+                } else {
+                    // Large shipments: minimum 1 pallet, or volume-based (whichever is higher)
+                    const volumeBasedPallets = totalVolume > 0 ? Math.ceil(totalVolume / 75) : 1;
+                    pivot[fc]['Sum of PALLETS'] = Math.max(1, volumeBasedPallets);
+                }
             });
 
             // Convert to array and sort alphabetically by FC
@@ -839,7 +1092,7 @@
             const statusMessages = document.getElementById('statusMessages');
             const warningDiv = document.createElement('div');
             warningDiv.className = 'status-message warning';
-            warningDiv.innerHTML = `⚠️ Warning: ${skus.length} SKUs not found in Product Catalog:`;
+            warningDiv.innerHTML = `⚠️ Warning: ${skus.length} SKUs could not be found or estimated:`;
             
             const listDiv = document.createElement('div');
             listDiv.className = 'missing-skus-list';
@@ -861,7 +1114,8 @@
             // Calculate statistics
             const stats = {
                 totalRows: processed.allData.length,
-                matchedSKUs: processed.allData.filter(r => r['ctn qty']).length,
+                matchedSKUs: processed.allData.filter(r => r['ctn qty'] && !processed.estimationLog.find(e => e.sku === r['SKU'])).length,
+                estimatedSKUs: processed.estimationLog.length,
                 missingSKUs: processed.missingSKUs.length,
                 encoreItems: processed.allData.filter(r => r['PO Warehouse Final'] === 'Encore').length,
                 unisItems: processed.allData.filter(r => r['PO Warehouse Final'] === 'UNIS').length,
@@ -879,7 +1133,11 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-value">${stats.matchedSKUs}</div>
-                    <div class="stat-label">Matched SKUs</div>
+                    <div class="stat-label">Exact Matches</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${stats.estimatedSKUs}</div>
+                    <div class="stat-label">Estimated SKUs</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value">${stats.encoreItems}</div>
@@ -896,6 +1154,10 @@
                 <div class="stat-card">
                     <div class="stat-value">${stats.totalPallets}</div>
                     <div class="stat-label">Total Pallets</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${stats.missingSKUs}</div>
+                    <div class="stat-label">Unresolved SKUs</div>
                 </div>
             `;
             
