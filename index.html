@@ -449,7 +449,6 @@
         <header class="header">
             <h1 class="title">Amazon PO Upload Processor</h1>
             <p class="subtitle">Automated US & EU Processing with Channel Support</p>
-            <span class="version-badge">v2.0 - Multi-Region Enhanced</span>
         </header>
 
         <div class="instructions">
@@ -460,15 +459,17 @@
                 <li>The tool will automatically detect:
                     <ul style="margin-left: 20px; margin-top: 5px;">
                         <li><strong>US Files:</strong> Uses Encore/UNIS warehouses</li>
-                        <li><strong>EU Files:</strong> Uses EU 3PL warehouse with country channels (SPAIN, ITALY, etc.)</li>
+                        <li><strong>EU Files:</strong> Uses EU 3PL warehouse with country channels</li>
+                        <li><strong>Vendor Codes:</strong> Maps to specific Amazon channels (e.g., PT71U → Canada)</li>
                     </ul>
                 </li>
                 <li>Click "Process Files" to generate the complete analysis</li>
                 <li>The tool creates appropriate worksheets based on file type:
                     <ul style="margin-left: 20px; margin-top: 5px;">
-                        <li><strong>US Files:</strong> Warehouse tabs (Encore/UNIS) and pivots</li>
-                        <li><strong>EU Files:</strong> EU 3PL tab and channel-specific pivots</li>
-                        <li><strong>Files with CHANNEL column:</strong> Additional channel-based tabs and pivots</li>
+                        <li><strong>Standard Tabs:</strong> Sheet1, accept, warehouse tabs, and warehouse pivots</li>
+                        <li><strong>Vendor Code Tabs:</strong> Warehouse+channel combinations</li>
+                        <li><strong>Channel Pivots:</strong> Separate pivot tables for each warehouse+channel combo</li>
+                        <li><strong>CHANNEL Column:</strong> Additional tabs if explicit CHANNEL column exists</li>
                     </ul>
                 </li>
                 <li>Missing logistics data will be intelligently estimated using similar products</li>
@@ -528,6 +529,22 @@
         // Store files from both input and drag-drop
         let catalogFileStore = null;
         let poFileStore = null;
+        
+        // Vendor Code to Amazon Channel mapping
+        const vendorChannelMapping = {
+            // US/North America channels
+            'PT71U': 'Canada',
+            'HG8BU': 'Canada DI',
+            'TZ7HI': 'Mexico',
+            'C132E': 'Fanshop',
+            'QJ6YU': 'US Kitchen',
+            // EU channels
+            '22BSF': 'Germany',
+            '33EZQ': 'United Kingdom',
+            'B47CH': 'Italy',
+            'NY752': 'Spain',
+            'OT73S': 'France'
+        };
 
         // File input handlers
         document.getElementById('catalogFile').addEventListener('change', function(e) {
@@ -1116,6 +1133,9 @@
             XLSX.utils.book_append_sheet(wb, wsAccept, 'accept');
             tabsCreated.push('accept - Non-zero quantities');
 
+            // Check if Vendor Code column exists
+            const hasVendorCodes = acceptData.length > 0 && 'Vendor Code' in acceptData[0];
+
             if (fileType === 'US') {
                 // US Processing - Warehouse-based tabs
                 const encoreData = acceptData.filter(row => row['PO Warehouse Final'] === 'Encore');
@@ -1148,7 +1168,73 @@
                     tabsCreated.push('unis pivot - Fulfillment Centers');
                 }
 
-                // If US file has channels, create channel-specific tabs
+                // Create vendor code-based channel tabs if vendor codes exist
+                if (hasVendorCodes) {
+                    // Get unique vendor codes in the data
+                    const vendorCodes = [...new Set(acceptData.map(row => row['Vendor Code']).filter(vc => vc))];
+                    
+                    vendorCodes.forEach(vendorCode => {
+                        // Get the channel name for this vendor code
+                        const channelName = vendorChannelMapping[vendorCode];
+                        
+                        if (channelName) {
+                            // Create clean channel name for tab names
+                            const cleanChannel = channelName.toLowerCase().replace(/[^a-z0-9]/g, '');
+                            
+                            // Process for each warehouse
+                            ['Encore', 'UNIS'].forEach(warehouse => {
+                                const warehouseVendorData = acceptData.filter(row => 
+                                    row['PO Warehouse Final'] === warehouse && 
+                                    row['Vendor Code'] === vendorCode
+                                );
+                                
+                                if (warehouseVendorData.length > 0) {
+                                    const warehouseLower = warehouse.toLowerCase();
+                                    
+                                    // Create warehouse+channel tab
+                                    const tabName = `accept ${warehouseLower} ${cleanChannel}`.substring(0, 31);
+                                    const wsWarehouseChannel = XLSX.utils.json_to_sheet(warehouseVendorData);
+                                    XLSX.utils.book_append_sheet(wb, wsWarehouseChannel, tabName);
+                                    tabsCreated.push(`${tabName} - ${warehouse} ${channelName} (${vendorCode})`);
+                                    
+                                    // Create warehouse+channel pivot
+                                    const pivotName = `${warehouseLower} ${cleanChannel} pivot`.substring(0, 31);
+                                    const warehouseChannelPivot = createPivotData(warehouseVendorData, 'Fulfillment Center');
+                                    const wsPivot = XLSX.utils.json_to_sheet(warehouseChannelPivot);
+                                    XLSX.utils.book_append_sheet(wb, wsPivot, pivotName);
+                                    tabsCreated.push(`${pivotName} - ${warehouse} ${channelName} FCs`);
+                                }
+                            });
+                        } else if (vendorCode) {
+                            // Vendor code not in mapping - still create tabs but use vendor code as label
+                            ['Encore', 'UNIS'].forEach(warehouse => {
+                                const warehouseVendorData = acceptData.filter(row => 
+                                    row['PO Warehouse Final'] === warehouse && 
+                                    row['Vendor Code'] === vendorCode
+                                );
+                                
+                                if (warehouseVendorData.length > 0) {
+                                    const warehouseLower = warehouse.toLowerCase();
+                                    
+                                    // Create warehouse+vendor code tab
+                                    const tabName = `accept ${warehouseLower} ${vendorCode.toLowerCase()}`.substring(0, 31);
+                                    const wsWarehouseVendor = XLSX.utils.json_to_sheet(warehouseVendorData);
+                                    XLSX.utils.book_append_sheet(wb, wsWarehouseVendor, tabName);
+                                    tabsCreated.push(`${tabName} - ${warehouse} vendor ${vendorCode}`);
+                                    
+                                    // Create warehouse+vendor pivot
+                                    const pivotName = `${warehouseLower} ${vendorCode.toLowerCase()} pivot`.substring(0, 31);
+                                    const warehouseVendorPivot = createPivotData(warehouseVendorData, 'Fulfillment Center');
+                                    const wsPivot = XLSX.utils.json_to_sheet(warehouseVendorPivot);
+                                    XLSX.utils.book_append_sheet(wb, wsPivot, pivotName);
+                                    tabsCreated.push(`${pivotName} - ${warehouse} ${vendorCode} FCs`);
+                                }
+                            });
+                        }
+                    });
+                }
+
+                // If US file has CHANNEL column (in addition to vendor codes), create channel-specific tabs
                 if (hasChannels) {
                     const channels = [...new Set(acceptData.map(row => row['CHANNEL']).filter(ch => ch))];
                     
@@ -1167,17 +1253,6 @@
                             const wsChannelPivot = XLSX.utils.json_to_sheet(channelPivot);
                             XLSX.utils.book_append_sheet(wb, wsChannelPivot, `${cleanChannel} pivot`.substring(0, 31));
                             tabsCreated.push(`${cleanChannel} pivot - ${channel} FCs`);
-                            
-                            // Create warehouse-channel combinations
-                            ['Encore', 'UNIS'].forEach(warehouse => {
-                                const warehouseChannelData = channelData.filter(row => row['PO Warehouse Final'] === warehouse);
-                                if (warehouseChannelData.length > 0) {
-                                    const tabName = `${warehouse.toLowerCase()} ${cleanChannel}`.substring(0, 31);
-                                    const wsWarehouseChannel = XLSX.utils.json_to_sheet(warehouseChannelData);
-                                    XLSX.utils.book_append_sheet(wb, wsWarehouseChannel, tabName);
-                                    tabsCreated.push(`${tabName} - ${warehouse} ${channel}`);
-                                }
-                            });
                         }
                     });
                 }
@@ -1198,7 +1273,37 @@
                 XLSX.utils.book_append_sheet(wb, wsEUPivot, 'EU 3PL pivot');
                 tabsCreated.push('EU 3PL pivot - All EU FCs');
 
-                // Create channel-specific tabs and pivots for EU
+                // For EU files, also check vendor codes
+                if (hasVendorCodes) {
+                    const vendorCodes = [...new Set(eu3plData.map(row => row['Vendor Code']).filter(vc => vc))];
+                    
+                    vendorCodes.forEach(vendorCode => {
+                        const channelName = vendorChannelMapping[vendorCode];
+                        const vendorData = eu3plData.filter(row => row['Vendor Code'] === vendorCode);
+                        
+                        if (vendorData.length > 0) {
+                            const cleanName = channelName ? 
+                                channelName.toLowerCase().replace(/[^a-z0-9]/g, '') : 
+                                vendorCode.toLowerCase();
+                            const displayName = channelName || vendorCode;
+                            
+                            // Create EU channel tab
+                            const tabName = `accept eu ${cleanName}`.substring(0, 31);
+                            const wsEUChannel = XLSX.utils.json_to_sheet(vendorData);
+                            XLSX.utils.book_append_sheet(wb, wsEUChannel, tabName);
+                            tabsCreated.push(`${tabName} - EU ${displayName}`);
+                            
+                            // Create EU channel pivot
+                            const pivotName = `eu ${cleanName} pivot`.substring(0, 31);
+                            const euChannelPivot = createPivotData(vendorData, 'Fulfillment Center');
+                            const wsPivot = XLSX.utils.json_to_sheet(euChannelPivot);
+                            XLSX.utils.book_append_sheet(wb, wsPivot, pivotName);
+                            tabsCreated.push(`${pivotName} - EU ${displayName} FCs`);
+                        }
+                    });
+                }
+
+                // Create channel-specific tabs and pivots for EU (if CHANNEL column exists)
                 if (hasChannels) {
                     const channels = [...new Set(acceptData.map(row => row['CHANNEL']).filter(ch => ch))];
                     
@@ -1411,6 +1516,17 @@
                 channels = [...new Set(acceptData.map(row => row['CHANNEL']).filter(ch => ch))];
             }
 
+            // Vendor Code analysis
+            let vendorCodeInfo = null;
+            if (acceptData.length > 0 && 'Vendor Code' in acceptData[0]) {
+                const vendorCodes = [...new Set(acceptData.map(row => row['Vendor Code']).filter(vc => vc))];
+                vendorCodeInfo = vendorCodes.map(vc => {
+                    const channel = vendorChannelMapping[vc];
+                    const count = acceptData.filter(row => row['Vendor Code'] === vc).length;
+                    return { code: vc, channel: channel || 'Unknown', count: count };
+                });
+            }
+
             const statsDiv = document.createElement('div');
             statsDiv.className = 'stats-grid';
             
@@ -1463,11 +1579,32 @@
             statsDiv.innerHTML = statsHTML;
             statusMessages.appendChild(statsDiv);
 
-            // Show channels if present
+            // Show vendor codes and their channels if present
+            if (vendorCodeInfo && vendorCodeInfo.length > 0) {
+                const vendorDiv = document.createElement('div');
+                vendorDiv.className = 'status-message info';
+                vendorDiv.innerHTML = '<strong>📊 Vendor Codes & Channels Detected:</strong>';
+                
+                const vendorList = document.createElement('div');
+                vendorList.style.marginTop = '10px';
+                
+                vendorCodeInfo.forEach(info => {
+                    const vendorItem = document.createElement('div');
+                    vendorItem.style.padding = '5px 0';
+                    vendorItem.innerHTML = `<span class="channel-badge" style="margin-right: 10px;">${info.code}</span> 
+                                           → ${info.channel} <span style="color: #b0c4de;">(${info.count} items)</span>`;
+                    vendorList.appendChild(vendorItem);
+                });
+                
+                vendorDiv.appendChild(vendorList);
+                statusMessages.appendChild(vendorDiv);
+            }
+
+            // Show channels if present (from CHANNEL column)
             if (channels.length > 0) {
                 const channelsDiv = document.createElement('div');
                 channelsDiv.className = 'status-message info';
-                channelsDiv.innerHTML = '<strong>📍 Channels Detected:</strong>';
+                channelsDiv.innerHTML = '<strong>📍 CHANNEL Column Values:</strong>';
                 
                 const channelsList = document.createElement('div');
                 channelsList.className = 'channels-list';
