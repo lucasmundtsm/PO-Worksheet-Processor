@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PO Worksheet Processor - Simple Modern (Enhanced with Estimation)</title>
+    <title>Universal PO Upload Processor - US/EU with Channel Support</title>
     <style>
         * {
             margin: 0;
@@ -48,6 +48,18 @@
             font-size: 1.2rem;
             color: #b0c4de;
             font-weight: 400;
+        }
+
+        .version-badge {
+            display: inline-block;
+            background: rgba(74, 222, 128, 0.2);
+            border: 1px solid #4ade80;
+            color: #4ade80;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            font-weight: 600;
         }
 
         .upload-section {
@@ -228,6 +240,27 @@
             color: #f87171;
         }
 
+        .file-type-badge {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        .file-type-badge.us {
+            background: rgba(59, 130, 246, 0.2);
+            border: 2px solid #3b82f6;
+            color: #93bbfc;
+        }
+
+        .file-type-badge.eu {
+            background: rgba(139, 92, 246, 0.2);
+            border: 2px solid #8b5cf6;
+            color: #c4b5fd;
+        }
+
         .missing-skus-list {
             max-height: 200px;
             overflow-y: auto;
@@ -307,6 +340,25 @@
             letter-spacing: 1px;
         }
 
+        .tabs-created-list {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .tabs-created-list h4 {
+            color: #4ade80;
+            margin-bottom: 10px;
+        }
+
+        .tab-item {
+            padding: 5px 0;
+            color: #b0c4de;
+            font-family: 'Courier New', monospace;
+        }
+
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -370,6 +422,22 @@
             font-size: 0.9rem;
             color: #4ade80;
         }
+
+        .channels-list {
+            display: inline-flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .channel-badge {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            color: #ffffff;
+        }
     </style>
 </head>
 <body>
@@ -379,25 +447,33 @@
 
     <div class="container">
         <header class="header">
-            <h1 class="title">PO Upload Processor</h1>
-            <p class="subtitle">Automated Product Catalog Integration & Analysis with Smart Estimation</p>
+            <h1 class="title">Amazon PO Upload Processor</h1>
+            <p class="subtitle">Automated US & EU Processing with Channel Support</p>
+            <span class="version-badge">v2.0 - Multi-Region Enhanced</span>
         </header>
 
         <div class="instructions">
             <h3>📋 Instructions</h3>
             <ol>
                 <li>Upload your Product Catalog CSV file (contains SKU information, carton quantities, weights, and volumes)</li>
-                <li>Upload your PO Upload Excel file (purchase order data from Amazon)</li>
+                <li>Upload your PO Upload Excel file (US or EU format)</li>
+                <li>The tool will automatically detect:
+                    <ul style="margin-left: 20px; margin-top: 5px;">
+                        <li><strong>US Files:</strong> Uses Encore/UNIS warehouses</li>
+                        <li><strong>EU Files:</strong> Uses EU 3PL warehouse with country channels (SPAIN, ITALY, etc.)</li>
+                    </ul>
+                </li>
                 <li>Click "Process Files" to generate the complete analysis</li>
-                <li>The tool will create multiple worksheets with calculations and pivot tables</li>
+                <li>The tool creates appropriate worksheets based on file type:
+                    <ul style="margin-left: 20px; margin-top: 5px;">
+                        <li><strong>US Files:</strong> Warehouse tabs (Encore/UNIS) and pivots</li>
+                        <li><strong>EU Files:</strong> EU 3PL tab and channel-specific pivots</li>
+                        <li><strong>Files with CHANNEL column:</strong> Additional channel-based tabs and pivots</li>
+                    </ul>
+                </li>
                 <li>Missing logistics data will be intelligently estimated using similar products</li>
-                <li>Detail rows show fractional pallets (Volume÷75), pivot tables show shipment pallets (&lt;15 cartons = 0, ≥15 cartons = rounded up whole numbers, min 1)</li>
                 <li>Download the processed Excel file with all tabs ready for use</li>
             </ol>
-            <div class="feature-highlight">
-                🧠 <strong>NEW:</strong> Smart Estimation Engine - When product data is missing, the tool will automatically estimate values based on similar SKUs, product families, and category defaults. An "estimation used" tab will show which values were estimated.<br><br>
-                📦 <strong>ENHANCED:</strong> Simplified Pallet Logic - Detail rows use fractional pallets (Volume÷75), while pivot tables use shipment logic (&lt;15 cartons = 0 pallets, ≥15 cartons = whole pallets rounded up from Volume÷75, minimum 1).
-            </div>
         </div>
 
         <div class="upload-section">
@@ -418,7 +494,7 @@
                     <input type="file" id="poFile" class="file-input" accept=".xlsx,.xls">
                     <label for="poFile" class="file-input-button" id="poLabel">
                         Choose PO Upload Excel...
-                        <div class="drag-text">or drag and drop file here</div>
+                        <div class="drag-text">US or EU format supported</div>
                     </label>
                 </div>
             </div>
@@ -446,6 +522,8 @@
         let catalogData = null;
         let poData = null;
         let processedWorkbook = null;
+        let fileType = null; // 'US' or 'EU'
+        let hasChannels = false;
         
         // Store files from both input and drag-drop
         let catalogFileStore = null;
@@ -575,19 +653,29 @@
 
                 // Read PO Upload Excel
                 showStatus('info', 'Reading PO Upload Excel file...');
-                poData = await readPOExcel(poFileStore);
-                showStatus('success', `PO Upload loaded: ${poData.length} rows`);
+                const poResult = await readPOExcel(poFileStore);
+                poData = poResult.data;
+                fileType = poResult.fileType;
+                hasChannels = poResult.hasChannels;
+                
+                // Show file type detection
+                const fileTypeBadge = document.createElement('div');
+                fileTypeBadge.className = `file-type-badge ${fileType.toLowerCase()}`;
+                fileTypeBadge.textContent = `📍 Detected: ${fileType} Format${hasChannels ? ' with Channels' : ''}`;
+                document.getElementById('statusMessages').appendChild(fileTypeBadge);
+                
+                showStatus('success', `PO Upload loaded: ${poData.length} rows (${fileType} format)`);
 
                 // Process the data
                 showStatus('info', 'Processing data and applying intelligent estimation...');
-                const processed = processData(poData, catalogData);
+                const processed = processData(poData, catalogData, fileType, hasChannels);
 
                 // Create Excel workbook
-                showStatus('info', 'Creating Excel workbook with multiple tabs...');
-                processedWorkbook = createExcelWorkbook(processed);
+                showStatus('info', 'Creating Excel workbook with regional tabs and channel pivots...');
+                processedWorkbook = createExcelWorkbook(processed, fileType, hasChannels);
 
                 // Show results
-                showResults(processed);
+                showResults(processed, fileType, hasChannels);
 
                 showStatus('success', '✅ Processing complete! Your file is ready to download.');
                 document.getElementById('downloadSection').classList.add('active');
@@ -604,7 +692,8 @@
         document.getElementById('downloadButton').addEventListener('click', function() {
             if (processedWorkbook) {
                 const date = new Date().toISOString().split('T')[0];
-                const filename = `PO_Upload_Processed_${date}.xlsx`;
+                const regionLabel = fileType === 'EU' ? 'EU' : 'US';
+                const filename = `PO_Upload_${regionLabel}_Processed_${date}.xlsx`;
                 XLSX.writeFile(processedWorkbook, filename);
                 showStatus('success', `File downloaded: ${filename}`);
             }
@@ -653,7 +742,42 @@
                         const workbook = XLSX.read(data, { type: 'array' });
                         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                         const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
-                        resolve(jsonData);
+                        
+                        // Detect file type based on warehouse values
+                        let detectedType = 'US'; // default
+                        let hasChannelColumn = false;
+                        
+                        if (jsonData.length > 0) {
+                            // Check for CHANNEL column
+                            hasChannelColumn = 'CHANNEL' in jsonData[0];
+                            
+                            // Check warehouse values to determine file type
+                            const warehouseColumn = 'PO Warehouse Final' in jsonData[0] ? 'PO Warehouse Final' : null;
+                            
+                            if (warehouseColumn) {
+                                const warehouses = [...new Set(jsonData.map(row => row[warehouseColumn]))];
+                                
+                                if (warehouses.includes('EU 3PL') || warehouses.some(w => w && w.includes('EU'))) {
+                                    detectedType = 'EU';
+                                } else if (warehouses.some(w => ['Encore', 'UNIS'].includes(w))) {
+                                    detectedType = 'US';
+                                }
+                            }
+                            
+                            // EU files should have CHANNEL column
+                            if (detectedType === 'EU' && !hasChannelColumn) {
+                                // Check if there's a Fulfilment Centre column which might indicate EU
+                                if ('Fulfilment Centre' in jsonData[0]) {
+                                    detectedType = 'EU';
+                                }
+                            }
+                        }
+                        
+                        resolve({
+                            data: jsonData,
+                            fileType: detectedType,
+                            hasChannels: hasChannelColumn
+                        });
                     } catch (error) {
                         reject(error);
                     }
@@ -662,7 +786,24 @@
             });
         }
 
-        function processData(poData, catalogData) {
+        function normalizeColumnName(name) {
+            // Handle column name variations between US and EU
+            const mappings = {
+                'Fulfillment Center': 'Fulfillment Center',
+                'Fulfilment Centre': 'Fulfillment Center',
+                'Order/PO Number': 'Order/PO Number',
+                'Order/PO number': 'Order/PO Number',
+                'External ID': 'External ID',
+                'Model Number': 'Model Number',
+                'Model number': 'Model Number',
+                'Total Qty to Fulfill': 'Total Qty to Fulfill',
+                'Quantity ordered': 'Total Qty to Fulfill' // EU uses this
+            };
+            
+            return mappings[name] || name;
+        }
+
+        function processData(poData, catalogData, fileType, hasChannels) {
             const processed = [];
             const missingSKUs = new Set();
             const estimationLog = [];
@@ -701,14 +842,32 @@
             });
 
             poData.forEach(row => {
+                // Normalize column names for consistent processing
+                const normalizedRow = {};
+                Object.keys(row).forEach(key => {
+                    const normalizedKey = normalizeColumnName(key);
+                    normalizedRow[normalizedKey] = row[key];
+                });
+                
+                // Get the correct SKU field
+                const skuValue = normalizedRow['SKU'] || normalizedRow['External ID'] || '';
+                
+                // Handle Total Qty to Fulfill - EU files might use "Quantity ordered"
+                let totalQty = 0;
+                if ('Total Qty to Fulfill' in normalizedRow) {
+                    totalQty = parseFloat(normalizedRow['Total Qty to Fulfill']) || 0;
+                } else if ('Quantity ordered' in row) {
+                    totalQty = parseFloat(row['Quantity ordered']) || 0;
+                }
+                
                 // Create base row with reordered columns
                 const processedRow = {
-                    'Order/PO Number': row['Order/PO Number'] || '',
-                    'SKU': row['SKU'] || row['External ID'] || '',
-                    'Model Number': row['Model Number'] || '',
-                    'ASIN': row['ASIN'] || '',
+                    'Order/PO Number': normalizedRow['Order/PO Number'] || row['Order/PO Number'] || row['Order/PO number'] || '',
+                    'SKU': skuValue,
+                    'Model Number': normalizedRow['Model Number'] || '',
+                    'ASIN': normalizedRow['ASIN'] || row['ASIN'] || '',
                     'po-asin': '', // Will be calculated
-                    'Total Qty to Fulfill': parseFloat(row['Total Qty to Fulfill']) || 0,
+                    'Total Qty to Fulfill': totalQty,
                     'ctn qty': '',
                     'CARTONS': '',
                     'cuft': '',
@@ -716,10 +875,15 @@
                     'lbs': '',
                     'WT': '',
                     'PALLETS': '',
-                    'Fulfillment Center': row['Fulfillment Center'] || '',
-                    'PO Warehouse Final': row['PO Warehouse Final'] || '',
-                    'UPC': row['UPC'] || ''
+                    'Fulfillment Center': normalizedRow['Fulfillment Center'] || row['Fulfilment Centre'] || '',
+                    'PO Warehouse Final': normalizedRow['PO Warehouse Final'] || row['PO Warehouse Final'] || '',
+                    'UPC': normalizedRow['UPC'] || row['UPC'] || ''
                 };
+                
+                // Add CHANNEL if present
+                if (hasChannels && row['CHANNEL']) {
+                    processedRow['CHANNEL'] = row['CHANNEL'];
+                }
 
                 // Add po-asin concatenation
                 if (processedRow['Order/PO Number'] && processedRow['ASIN']) {
@@ -858,7 +1022,7 @@
 
                 // Add remaining original columns
                 Object.keys(row).forEach(key => {
-                    if (!processedRow.hasOwnProperty(key)) {
+                    if (!processedRow.hasOwnProperty(key) && key !== 'Quantity ordered') {
                         processedRow[key] = row[key];
                     }
                 });
@@ -914,7 +1078,6 @@
             }
 
             // Level 3: Category-based estimation (fallback)
-            // Try to determine category from SKU patterns or use defaults
             const categoryDefaults = {
                 'ctnQty': { 'Tumblers': 12, 'Kids Bags': 40, 'Accessory': 24, 'default': 12 },
                 'cuft': { 'Tumblers': 0.8, 'Kids Bags': 0.5, 'Accessory': 0.6, 'default': 0.7 },
@@ -938,44 +1101,137 @@
             return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
         }
 
-        function createExcelWorkbook(processed) {
+        function createExcelWorkbook(processed, fileType, hasChannels) {
             const wb = XLSX.utils.book_new();
+            const tabsCreated = [];
 
             // Sheet1 - All data
             const ws1 = XLSX.utils.json_to_sheet(processed.allData);
             XLSX.utils.book_append_sheet(wb, ws1, 'Sheet1');
+            tabsCreated.push('Sheet1 - All data');
 
             // Accept sheet - Remove rows with 0 Total Qty to Fulfill
             const acceptData = processed.allData.filter(row => row['Total Qty to Fulfill'] > 0);
             const wsAccept = XLSX.utils.json_to_sheet(acceptData);
             XLSX.utils.book_append_sheet(wb, wsAccept, 'accept');
+            tabsCreated.push('accept - Non-zero quantities');
 
-            // Accept Encore - Only Encore warehouse
-            const encoreData = acceptData.filter(row => row['PO Warehouse Final'] === 'Encore');
-            const wsEncore = XLSX.utils.json_to_sheet(encoreData);
-            XLSX.utils.book_append_sheet(wb, wsEncore, 'accept encore');
+            if (fileType === 'US') {
+                // US Processing - Warehouse-based tabs
+                const encoreData = acceptData.filter(row => row['PO Warehouse Final'] === 'Encore');
+                const unisData = acceptData.filter(row => row['PO Warehouse Final'] === 'UNIS');
 
-            // Accept UNIS - Only UNIS warehouse
-            const unisData = acceptData.filter(row => row['PO Warehouse Final'] === 'UNIS');
-            const wsUnis = XLSX.utils.json_to_sheet(unisData);
-            XLSX.utils.book_append_sheet(wb, wsUnis, 'accept unis');
+                if (encoreData.length > 0) {
+                    const wsEncore = XLSX.utils.json_to_sheet(encoreData);
+                    XLSX.utils.book_append_sheet(wb, wsEncore, 'accept encore');
+                    tabsCreated.push('accept encore - Encore warehouse');
+                }
 
-            // Create Encore Pivot
-            const encorePivot = createPivotData(encoreData);
-            const wsEncorePivot = XLSX.utils.json_to_sheet(encorePivot);
-            XLSX.utils.book_append_sheet(wb, wsEncorePivot, 'encore pivot');
+                if (unisData.length > 0) {
+                    const wsUnis = XLSX.utils.json_to_sheet(unisData);
+                    XLSX.utils.book_append_sheet(wb, wsUnis, 'accept unis');
+                    tabsCreated.push('accept unis - UNIS warehouse');
+                }
 
-            // Create UNIS Pivot
-            const unisPivot = createPivotData(unisData);
-            const wsUnisPivot = XLSX.utils.json_to_sheet(unisPivot);
-            XLSX.utils.book_append_sheet(wb, wsUnisPivot, 'unis pivot');
+                // Create warehouse pivots
+                if (encoreData.length > 0) {
+                    const encorePivot = createPivotData(encoreData, 'Fulfillment Center');
+                    const wsEncorePivot = XLSX.utils.json_to_sheet(encorePivot);
+                    XLSX.utils.book_append_sheet(wb, wsEncorePivot, 'encore pivot');
+                    tabsCreated.push('encore pivot - Fulfillment Centers');
+                }
 
-            // Create Estimation Log sheet
+                if (unisData.length > 0) {
+                    const unisPivot = createPivotData(unisData, 'Fulfillment Center');
+                    const wsUnisPivot = XLSX.utils.json_to_sheet(unisPivot);
+                    XLSX.utils.book_append_sheet(wb, wsUnisPivot, 'unis pivot');
+                    tabsCreated.push('unis pivot - Fulfillment Centers');
+                }
+
+                // If US file has channels, create channel-specific tabs
+                if (hasChannels) {
+                    const channels = [...new Set(acceptData.map(row => row['CHANNEL']).filter(ch => ch))];
+                    
+                    channels.forEach(channel => {
+                        const channelData = acceptData.filter(row => row['CHANNEL'] === channel);
+                        if (channelData.length > 0) {
+                            const cleanChannel = channel.toLowerCase().replace(/[^a-z0-9]/g, '');
+                            
+                            // Create channel tab
+                            const wsChannel = XLSX.utils.json_to_sheet(channelData);
+                            XLSX.utils.book_append_sheet(wb, wsChannel, `accept ${cleanChannel}`.substring(0, 31));
+                            tabsCreated.push(`accept ${cleanChannel} - ${channel} channel`);
+                            
+                            // Create channel pivot
+                            const channelPivot = createPivotData(channelData, 'Fulfillment Center');
+                            const wsChannelPivot = XLSX.utils.json_to_sheet(channelPivot);
+                            XLSX.utils.book_append_sheet(wb, wsChannelPivot, `${cleanChannel} pivot`.substring(0, 31));
+                            tabsCreated.push(`${cleanChannel} pivot - ${channel} FCs`);
+                            
+                            // Create warehouse-channel combinations
+                            ['Encore', 'UNIS'].forEach(warehouse => {
+                                const warehouseChannelData = channelData.filter(row => row['PO Warehouse Final'] === warehouse);
+                                if (warehouseChannelData.length > 0) {
+                                    const tabName = `${warehouse.toLowerCase()} ${cleanChannel}`.substring(0, 31);
+                                    const wsWarehouseChannel = XLSX.utils.json_to_sheet(warehouseChannelData);
+                                    XLSX.utils.book_append_sheet(wb, wsWarehouseChannel, tabName);
+                                    tabsCreated.push(`${tabName} - ${warehouse} ${channel}`);
+                                }
+                            });
+                        }
+                    });
+                }
+                
+            } else if (fileType === 'EU') {
+                // EU Processing
+                const eu3plData = acceptData.filter(row => row['PO Warehouse Final'] === 'EU 3PL');
+                
+                if (eu3plData.length > 0) {
+                    const wsEU = XLSX.utils.json_to_sheet(eu3plData);
+                    XLSX.utils.book_append_sheet(wb, wsEU, 'accept EU 3PL');
+                    tabsCreated.push('accept EU 3PL - EU warehouse');
+                }
+
+                // Create EU pivot
+                const euPivot = createPivotData(eu3plData, 'Fulfillment Center');
+                const wsEUPivot = XLSX.utils.json_to_sheet(euPivot);
+                XLSX.utils.book_append_sheet(wb, wsEUPivot, 'EU 3PL pivot');
+                tabsCreated.push('EU 3PL pivot - All EU FCs');
+
+                // Create channel-specific tabs and pivots for EU
+                if (hasChannels) {
+                    const channels = [...new Set(acceptData.map(row => row['CHANNEL']).filter(ch => ch))];
+                    
+                    channels.forEach(channel => {
+                        const channelData = acceptData.filter(row => row['CHANNEL'] === channel);
+                        if (channelData.length > 0) {
+                            const cleanChannel = channel.toLowerCase().replace(/[^a-z0-9]/g, '');
+                            
+                            // Create channel tab
+                            const wsChannel = XLSX.utils.json_to_sheet(channelData);
+                            XLSX.utils.book_append_sheet(wb, wsChannel, `accept ${cleanChannel}`.substring(0, 31));
+                            tabsCreated.push(`accept ${cleanChannel} - ${channel} orders`);
+                            
+                            // Create channel pivot
+                            const channelPivot = createPivotData(channelData, 'Fulfillment Center');
+                            const wsChannelPivot = XLSX.utils.json_to_sheet(channelPivot);
+                            XLSX.utils.book_append_sheet(wb, wsChannelPivot, `${cleanChannel} pivot`.substring(0, 31));
+                            tabsCreated.push(`${cleanChannel} pivot - ${channel} FCs`);
+                        }
+                    });
+                }
+            }
+
+            // Create Estimation Log sheet if needed
             if (processed.estimationLog && processed.estimationLog.length > 0) {
                 const estimationSheet = createEstimationSheet(processed.estimationLog);
                 const wsEstimation = XLSX.utils.json_to_sheet(estimationSheet);
                 XLSX.utils.book_append_sheet(wb, wsEstimation, 'estimation used');
+                tabsCreated.push('estimation used - Estimated values log');
             }
+
+            // Show tabs created
+            showTabsCreated(tabsCreated);
 
             return wb;
         }
@@ -1002,12 +1258,12 @@
             return estimationRows;
         }
 
-        function createPivotData(data) {
+        function createPivotData(data, groupByField) {
             const pivot = {};
 
-            // Group by Fulfillment Center
+            // Group by the specified field (usually Fulfillment Center)
             data.forEach(row => {
-                const fc = row['Fulfillment Center'] || 'Unknown';
+                const fc = row[groupByField] || 'Unknown';
                 if (!pivot[fc]) {
                     pivot[fc] = {
                         'Row Labels': fc,
@@ -1108,25 +1364,57 @@
             statusMessages.appendChild(warningDiv);
         }
 
-        function showResults(processed) {
+        function showTabsCreated(tabs) {
+            const statusMessages = document.getElementById('statusMessages');
+            
+            const tabsDiv = document.createElement('div');
+            tabsDiv.className = 'tabs-created-list';
+            
+            tabsDiv.innerHTML = '<h4>📑 Excel Tabs Created:</h4>';
+            
+            tabs.forEach(tab => {
+                const tabItem = document.createElement('div');
+                tabItem.className = 'tab-item';
+                tabItem.textContent = `• ${tab}`;
+                tabsDiv.appendChild(tabItem);
+            });
+            
+            statusMessages.appendChild(tabsDiv);
+        }
+
+        function showResults(processed, fileType, hasChannels) {
             const statusMessages = document.getElementById('statusMessages');
             
             // Calculate statistics
+            const acceptData = processed.allData.filter(row => row['Total Qty to Fulfill'] > 0);
+            
             const stats = {
                 totalRows: processed.allData.length,
                 matchedSKUs: processed.allData.filter(r => r['ctn qty'] && !processed.estimationLog.find(e => e.sku === r['SKU'])).length,
                 estimatedSKUs: processed.estimationLog.length,
                 missingSKUs: processed.missingSKUs.length,
-                encoreItems: processed.allData.filter(r => r['PO Warehouse Final'] === 'Encore').length,
-                unisItems: processed.allData.filter(r => r['PO Warehouse Final'] === 'UNIS').length,
                 totalCartons: processed.allData.reduce((sum, r) => sum + (r['CARTONS'] || 0), 0),
                 totalPallets: processed.allData.reduce((sum, r) => sum + (r['PALLETS'] || 0), 0).toFixed(2)
             };
 
+            // Add file-type specific stats
+            if (fileType === 'US') {
+                stats.encoreItems = acceptData.filter(r => r['PO Warehouse Final'] === 'Encore').length;
+                stats.unisItems = acceptData.filter(r => r['PO Warehouse Final'] === 'UNIS').length;
+            } else if (fileType === 'EU') {
+                stats.eu3plItems = acceptData.filter(r => r['PO Warehouse Final'] === 'EU 3PL').length;
+            }
+
+            // Channel stats if applicable
+            let channels = [];
+            if (hasChannels) {
+                channels = [...new Set(acceptData.map(row => row['CHANNEL']).filter(ch => ch))];
+            }
+
             const statsDiv = document.createElement('div');
             statsDiv.className = 'stats-grid';
             
-            statsDiv.innerHTML = `
+            let statsHTML = `
                 <div class="stat-card">
                     <div class="stat-value">${stats.totalRows}</div>
                     <div class="stat-label">Total Rows</div>
@@ -1138,7 +1426,10 @@
                 <div class="stat-card">
                     <div class="stat-value">${stats.estimatedSKUs}</div>
                     <div class="stat-label">Estimated SKUs</div>
-                </div>
+                </div>`;
+            
+            if (fileType === 'US') {
+                statsHTML += `
                 <div class="stat-card">
                     <div class="stat-value">${stats.encoreItems}</div>
                     <div class="stat-label">Encore Items</div>
@@ -1146,7 +1437,16 @@
                 <div class="stat-card">
                     <div class="stat-value">${stats.unisItems}</div>
                     <div class="stat-label">UNIS Items</div>
-                </div>
+                </div>`;
+            } else if (fileType === 'EU') {
+                statsHTML += `
+                <div class="stat-card">
+                    <div class="stat-value">${stats.eu3plItems}</div>
+                    <div class="stat-label">EU 3PL Items</div>
+                </div>`;
+            }
+            
+            statsHTML += `
                 <div class="stat-card">
                     <div class="stat-value">${stats.totalCartons}</div>
                     <div class="stat-label">Total Cartons</div>
@@ -1158,10 +1458,30 @@
                 <div class="stat-card">
                     <div class="stat-value">${stats.missingSKUs}</div>
                     <div class="stat-label">Unresolved SKUs</div>
-                </div>
-            `;
+                </div>`;
             
+            statsDiv.innerHTML = statsHTML;
             statusMessages.appendChild(statsDiv);
+
+            // Show channels if present
+            if (channels.length > 0) {
+                const channelsDiv = document.createElement('div');
+                channelsDiv.className = 'status-message info';
+                channelsDiv.innerHTML = '<strong>📍 Channels Detected:</strong>';
+                
+                const channelsList = document.createElement('div');
+                channelsList.className = 'channels-list';
+                
+                channels.forEach(channel => {
+                    const badge = document.createElement('span');
+                    badge.className = 'channel-badge';
+                    badge.textContent = channel;
+                    channelsList.appendChild(badge);
+                });
+                
+                channelsDiv.appendChild(channelsList);
+                statusMessages.appendChild(channelsDiv);
+            }
         }
 
         function showLoading(show) {
